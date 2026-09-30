@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大屏播放 - {{ job_id }}</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --surface: #ffffff; --border: #e3e5e9;
+    --text-muted: #6b7280; --text-faint: #9aa0aa;
+    --accent: #2563eb; --accent-soft: #eaf1ff;
+    --radius: 10px; --radius-sm: 6px;
+  }
+  body { background: #0b0c0e; }
+  .theater-wrap { max-width: 1400px; margin: 0 auto; padding: 20px; display: flex; gap: 24px; align-items: flex-start; }
+  .theater-video-col { flex: 2; min-width: 0; }
+  .theater-list-col { flex: 1; min-width: 280px; max-width: 380px; background: var(--surface); border-radius: var(--radius); padding: 16px; max-height: 90vh; overflow-y: auto; }
+  video { border-radius: 12px; }
+  .theater-top { display: flex; justify-content: space-between; align-items: center; color: #ccc; margin-bottom: 12px; font-size: 13px; }
+  .theater-top a { color: #8ab4f8; }
+  .t-row { padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text-muted); cursor: pointer; }
+  .t-row:hover { background: var(--bg); }
+  .t-row.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .t-row .t-time { font-size: 11px; color: var(--text-faint); display: block; margin-bottom: 2px; }
+  @media (max-width: 900px) {
+    .theater-wrap { flex-direction: column; }
+    .theater-list-col { max-width: none; max-height: 300px; }
+  }
+</style>
+</head>
+<body>
+<div class="theater-wrap">
+  <div class="theater-video-col">
+    <div class="theater-top">
+      <span>大屏播放模式</span>
+      <a href="/job/{{ job_id }}">← 返回编辑</a>
+    </div>
+    <video id="video" controls autoplay style="width:100%" src="/job/{{ job_id }}/file/source.mp4"></video>
+  </div>
+  <div class="theater-list-col" id="list"></div>
+</div>
+
+<script>
+const jobId = "{{ job_id }}";
+function srtTimeToSeconds(t) {
+  const [hms, ms] = t.split(',');
+  const [h, m, s] = hms.split(':').map(Number);
+  return h * 3600 + m * 60 + s + (parseInt(ms, 10) || 0) / 1000;
+}
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.innerText = s || '';
+  return d.innerHTML;
+}
+
+let entries = [];
+let activeIndex = null;
+const video = document.getElementById('video');
+
+fetch(`/api/job/${jobId}`).then(r => r.json()).then(status => {
+  entries = (status.entries || []).map(e => ({
+    ...e, startSec: srtTimeToSeconds(e.start), endSec: srtTimeToSeconds(e.end),
+  }));
+
+  const track = video.addTextTrack('subtitles', '字幕', 'ja');
+  track.mode = 'showing';
+  entries.forEach(e => track.addCue(new VTTCue(e.startSec, Math.max(e.endSec, e.startSec + 0.3), e.text)));
+
+  const list = document.getElementById('list');
+  list.innerHTML = entries.map(e => `
+    <div class="t-row" id="row-${e.index}" onclick="seek(${e.startSec})">
+      <span class="t-time">#${e.index} ${formatTime(e.startSec)}</span>${escapeHtml(e.text)}
+    </div>
+  `).join('');
+});
+
+function seek(sec) { video.currentTime = sec; video.play(); }
+
+video.addEventListener('timeupdate', () => {
+  const t = video.currentTime;
+  let active = entries.find(e => t >= e.startSec && t < e.endSec);
+  if (!active) active = [...entries].reverse().find(e => t >= e.startSec);
+  const idx = active ? active.index : null;
+  if (idx === activeIndex) return;
+  if (activeIndex !== null) { const p = document.getElementById(`row-${activeIndex}`); if (p) p.classList.remove('active'); }
+  activeIndex = idx;
+  if (idx !== null) {
+    const row = document.getElementById(`row-${idx}`);
+    if (row) { row.classList.add('active'); row.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  }
+});
+</script>
+</body>
+</html>
