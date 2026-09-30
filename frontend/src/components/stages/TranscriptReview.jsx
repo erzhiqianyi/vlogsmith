@@ -235,7 +235,7 @@ export default function TranscriptReview({ jobId, status, onAdvance, onAction, m
 
   return (
     <StepLayout
-      className="flex gap-8"
+      className="flex gap-8 overflow-hidden pb-7"
       footer={(
         <>
           <span className="mr-auto text-[13px] text-muted-foreground">
@@ -248,8 +248,10 @@ export default function TranscriptReview({ jobId, status, onAdvance, onAction, m
         </>
       )}
     >
-      <div className="sticky top-0 flex w-[480px] shrink-0 flex-col gap-4 self-start">
-        <video ref={attachVideoRef} controls src={jobFileUrl(jobId, 'source.mp4')} className="aspect-video w-full rounded-xl bg-black" />
+      {/* Each column scrolls on its own, so a long AI summary on the left stays reachable
+          instead of running under the footer. */}
+      <div className="flex w-[clamp(300px,36%,480px)] shrink-0 flex-col gap-4 overflow-y-auto pr-1">
+        <video ref={attachVideoRef} controls src={jobFileUrl(jobId, 'source.mp4')} className="aspect-video w-full shrink-0 rounded-xl bg-black" />
         <Button variant="outline" size="sm" className="self-start" onClick={() => window.open(`/job/${jobId}/theater`, '_blank')}>
           <Maximize2 className="size-3.5" /> 大屏播放
         </Button>
@@ -269,10 +271,10 @@ export default function TranscriptReview({ jobId, status, onAdvance, onAction, m
         )}
       </div>
 
-      <div className="min-w-0 flex-1 self-start overflow-hidden rounded-xl border bg-card">
-        <div className="flex items-center border-b px-4 py-3 text-[13px] text-muted-foreground">
+      <div className="min-w-0 flex-1 overflow-y-auto rounded-xl border bg-card">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-card px-4 py-3 text-[13px] text-muted-foreground">
           <span>共 {entries.length} 行 · 勾选几行可以让 AI 专门改这几行</span>
-          {pendingCount > 0 && <span className="ml-auto text-primary-soft-foreground">{pendingCount} 条建议待处理</span>}
+          {pendingCount > 0 && <span className="ml-auto shrink-0 text-primary-soft-foreground">{pendingCount} 条建议待处理</span>}
         </div>
         {entries.map((e) => (
           <EntryRow
